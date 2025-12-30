@@ -1,0 +1,240 @@
+reactblock.html
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Forsaken Mobile - Black Flash</title>
+    <style>
+        body {
+            background-color: #050505; color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden; touch-action: manipulation;
+        }
+        
+        /* Hiệu ứng Hắc Thiểm */
+        .kokusen-active { animation: kokusen-vibe 0.5s steps(2), shake 0.15s infinite; }
+        @keyframes kokusen-vibe { 0% { filter: invert(1) contrast(8); } 100% { filter: invert(0); } }
+        @keyframes shake {
+            0% { transform: translate(4px, 4px); }
+            50% { transform: translate(-4px, -2px); }
+            100% { transform: translate(2px, -4px); }
+        }
+
+        #ui-layer { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; z-index: 100; }
+        .stat { font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #ff0000; }
+
+        #arena {
+            position: relative; width: 95vw; height: 40vh;
+            border-bottom: 3px solid #444;
+            display: flex; align-items: flex-end; justify-content: center;
+            gap: 100px; padding-bottom: 10px;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        #lightning-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+
+        .character { width: 50px; height: 100px; position: relative; z-index: 10; border-radius: 4px; }
+        .survivor { background: #3498db; border: 2px solid #2980b9; }
+        
+        .arm {
+            position: absolute; width: 35px; height: 14px; 
+            background: #f1c40f; border: 2px solid #d4ac0d;
+            border-radius: 3px; top: 35px; left: 10px;
+            transform-origin: left center; transition: 0.1s; z-index: 5;
+        }
+        .arm-block { transform: rotate(-80deg) translateY(-15px); border-color: #fff; z-index: 11; }
+        .arm-punch { left: 45px !important; background: #000 !important; border: 2px solid #ff0000 !important; z-index: 12; }
+
+        .killer { background: #000; border: 2px solid #ff0000; transition: 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .killer-knocked { transform: translate(500px, -400px) rotate(1000deg) !important; opacity: 0; }
+
+        #weapon-container { position: absolute; bottom: 40px; left: -5px; transform-origin: bottom center; z-index: 11; }
+        .weapon { position: absolute; display: none; transform-origin: bottom center; background: #fff; }
+        .claw { width: 15px; height: 60px; } .fist { width: 30px; height: 30px; background: #f1c40f; }
+        /* Thêm các loại vũ khí khác tương tự nếu cần... */
+
+        .menu-mobile { 
+            display: flex; overflow-x: auto; width: 100%; gap: 5px; padding: 10px;
+            scrollbar-width: none;
+        }
+        .menu-mobile button { 
+            flex: 0 0 auto; padding: 8px 15px; background: #222; color: #fff; border: 1px solid #444; 
+            font-size: 12px; font-weight: bold; border-radius: 5px;
+        }
+
+        /* NÚT ĐIỀU KHIỂN MOBILE */
+        .controls {
+            position: fixed; bottom: 20px; width: 100%;
+            display: flex; justify-content: space-between; padding: 0 30px;
+            box-sizing: border-box; pointer-events: none;
+        }
+        .btn-touch {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            color: white; font-weight: bold; font-size: 20px;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: auto; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-block { border-color: #3498db; }
+        .btn-parry { border-color: #ff0000; text-shadow: 0 0 10px red; }
+        .btn-touch:active { background: rgba(255, 255, 255, 0.4); transform: scale(0.9); }
+
+    </style>
+</head>
+<body onclick="initAudio()">
+
+    <div id="ui-layer">
+        <div class="stat">SCORE: <span id="score">0</span></div>
+        <div class="stat">STREAK: <span id="streak">0</span></div>
+    </div>
+
+    <div id="msg" style="font-size:20px; font-weight:900; height:40px; margin-top: 50px;">CHẠM ĐỂ CHƠI</div>
+    
+    <div id="arena">
+        <canvas id="lightning-canvas"></canvas>
+        <div class="character survivor" id="player">
+            <div class="arm" id="p-arm"></div>
+        </div>
+        <div class="character killer" id="killer-body">
+            <div id="k-name" style="position:absolute; top:-30px; width:100%; text-align:center; color:red; font-size:14px;">OFFLINE</div>
+            <div id="weapon-container">
+                <div id="w-claw" class="weapon claw" style="display:block"></div>
+                </div>
+        </div>
+    </div>
+
+    <div class="menu-mobile">
+        <button onclick="setup('john', 0.4, 'John Doe')">John Doe</button>
+        <button onclick="setup('noli', 0.35, 'Noli')">Noli</button>
+        <button onclick="setup('nos', 0.3, 'Guest 666')">Guest 666</button>
+        <button onclick="setup('jason', 0.2, 'Jason')">Jason</button>
+        <button onclick="setup('cool', 0.1, 'C00lkidd')">C00lkidd</button>
+    </div>
+
+    <div class="controls">
+        <div class="btn-touch btn-block" id="touch-q">BLOCK</div>
+        <div class="btn-touch btn-parry" id="touch-r">R</div>
+    </div>
+
+    <audio id="sndB" src="block.mp3" preload="auto"></audio>
+    <audio id="sndP" src="parry.mp3" preload="auto"></audio>
+
+    <script>
+        let score = 0, streak = 0;
+        let baseWindUp = 0.4, currentType = '';
+        let isBlocking = false, canParry = false, hasQ = false;
+        let timers = [];
+        let audioReady = false;
+
+        const canvas = document.getElementById('lightning-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight * 0.4;
+
+        function initAudio() {
+            if (!audioReady) {
+                document.getElementById('sndB').play().then(()=>document.getElementById('sndB').pause());
+                document.getElementById('sndP').play().then(()=>document.getElementById('sndP').pause());
+                audioReady = true;
+                document.getElementById('msg').innerText = "CHỌN KILLER!";
+            }
+        }
+
+        function setup(type, time, name) {
+            initAudio();
+            timers.forEach(t => clearTimeout(t)); timers = [];
+            currentType = type; baseWindUp = time;
+            document.getElementById('k-name').innerText = name.toUpperCase();
+            loop();
+        }
+
+        function loop() {
+            timers.forEach(t => clearTimeout(t));
+            const wWrap = document.getElementById('weapon-container');
+            const arm = document.getElementById('p-arm');
+            wWrap.style.transition = "0.2s";
+            wWrap.style.transform = "rotate(0deg)";
+            arm.className = "arm";
+            document.getElementById('killer-body').className = "character killer";
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            isBlocking = false; canParry = false; hasQ = false;
+            document.getElementById('msg').innerText = "ĐANG CHỜ...";
+
+            timers.push(setTimeout(() => {
+                if (Math.random() < 0.3) {
+                    document.getElementById('msg').innerText = "NHỬ (BAIT)!";
+                    wWrap.style.transform = "rotate(-35deg)";
+                    timers.push(setTimeout(() => {
+                        wWrap.style.transform = "rotate(0deg)";
+                        timers.push(setTimeout(windUp, 300));
+                    }, 150));
+                } else windUp();
+            }, Math.random() * 2000 + 1000));
+        }
+
+        function windUp() {
+            document.getElementById('msg').innerText = "CẢNH BÁO!";
+            const wWrap = document.getElementById('weapon-container');
+            wWrap.style.transition = `transform ${baseWindUp}s ease-in-out`;
+            wWrap.style.transform = "rotate(-110deg)";
+            timers.push(setTimeout(attack, baseWindUp * 1000));
+        }
+
+        function attack() {
+            document.getElementById('msg').innerText = "VỤT!";
+            const wWrap = document.getElementById('weapon-container');
+            wWrap.style.transition = "0.05s linear";
+            wWrap.style.transform = "rotate(60deg)";
+            timers.push(setTimeout(() => {
+                if (isBlocking) {
+                    document.getElementById('msg').innerText = "BẤM R!";
+                    document.getElementById('sndB').currentTime = 0; document.getElementById('sndB').play();
+                    canParry = true; streak++;
+                    document.getElementById('streak').innerText = streak;
+                    setTimeout(() => canParry = false, 500);
+                } else {
+                    document.getElementById('msg').innerText = "HỤT!"; 
+                    streak = 0; document.getElementById('streak').innerText = 0;
+                }
+                timers.push(setTimeout(loop, 2000));
+            }, 60));
+        }
+
+        function triggerBlock() {
+            if (!hasQ && currentType !== '') {
+                const arm = document.getElementById('p-arm');
+                hasQ = true; isBlocking = true;
+                arm.classList.add('arm-block');
+                setTimeout(() => { isBlocking = false; if(!canParry) arm.classList.remove('arm-block'); }, 450);
+            }
+        }
+
+        function triggerParry() {
+            if (canParry) {
+                const arm = document.getElementById('p-arm');
+                canParry = false; score += 100;
+                document.getElementById('score').innerText = score;
+                document.getElementById('sndP').currentTime = 0; document.getElementById('sndP').play();
+                document.body.classList.add('kokusen-active');
+                arm.classList.remove('arm-block'); 
+                arm.classList.add('arm-punch');
+                document.getElementById('killer-body').classList.add('killer-knocked');
+                document.getElementById('msg').innerText = "BLACK FLASH!";
+                setTimeout(() => { document.body.classList.remove('kokusen-active'); }, 500);
+            }
+        }
+
+        // Sự kiện Touch cho Mobile
+        document.getElementById('touch-q').addEventListener('touchstart', (e) => { e.preventDefault(); triggerBlock(); });
+        document.getElementById('touch-r').addEventListener('touchstart', (e) => { e.preventDefault(); triggerParry(); });
+        
+        // Hỗ trợ cả chuột trên máy tính
+        document.getElementById('touch-q').addEventListener('mousedown', triggerBlock);
+        document.getElementById('touch-r').addEventListener('mousedown', triggerParry);
+
+    </script>
+</body>
+</html>

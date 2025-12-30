@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Forsaken Mobile v3 - Full Fixed</title>
+    <style>
+        body {
+            background-color: #050505; color: #fff; margin: 0; overflow: hidden;
+            font-family: sans-serif; height: 100vh; touch-action: none;
+        }
+
+        .kokusen-active { animation: kokusen-vibe 0.5s steps(2), shake 0.1s infinite; }
+        @keyframes kokusen-vibe { 0% { filter: invert(1) contrast(5); } 100% { filter: invert(0); } }
+        @keyframes shake { 0% { transform: translate(5px,5px); } 50% { transform: translate(-5px,-5px); } }
+
+        #arena {
+            width: 100%; height: 45vh; border-bottom: 3px solid #444;
+            display: flex; align-items: flex-end; justify-content: center;
+            gap: 100px; position: relative; background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        .character { width: 55px; height: 110px; position: relative; border-radius: 4px; z-index: 10; }
+        .survivor { background: #3498db; border: 1px solid #2980b9; }
+        .killer { background: #000; border: 2px solid #ff0000; transition: 0.5s; }
+
+        .arm {
+            position: absolute; width: 40px; height: 16px; background: #f1c40f;
+            border-radius: 3px; top: 40px; left: 10px; z-index: 5; transition: 0.1s;
+            transform-origin: left center;
+        }
+        .is-blocking { transform: rotate(-80deg) translateY(-20px) !important; z-index: 15 !important; border: 2px solid #fff; box-shadow: 0 0 15px #fff; }
+        .is-punching { left: 65px !important; background: #000 !important; border: 2.5px solid red !important; z-index: 15 !important; transform: rotate(0deg) !important; }
+
+        .killer-knocked { transform: translate(600px, -600px) rotate(1000deg); opacity: 0; }
+
+        #weapon-container { position: absolute; bottom: 50px; left: -10px; transform-origin: bottom center; z-index: 11; transition: 0.2s; }
+        .weapon { position: absolute; display: none; transform-origin: bottom center; background: #fff; }
+        .claw { width: 20px; height: 80px; } 
+        .dual { width: 8px; height: 100px; box-shadow: -12px 0 0 #fff; }
+        .dagger { width: 8px; height: 50px; transform: rotate(-90deg); } 
+        .h-claw { width: 70px; height: 12px; background: #ff4757; }
+        .machete { width: 15px; height: 90px; } 
+        .fist { width: 35px; height: 35px; background: #f1c40f; border-radius: 5px; }
+
+        .controls { position: fixed; bottom: 8%; width: 100%; display: flex; justify-content: space-around; padding: 0 25px; box-sizing: border-box; }
+        .btn {
+            width: 95px; height: 95px; border-radius: 50%; border: 4px solid #fff;
+            color: white; font-weight: bold; font-size: 18px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.1); -webkit-tap-highlight-color: transparent;
+        }
+        .btn-block { border-color: #3498db; }
+        .btn-parry { border-color: #ff0000; }
+
+        .scroll-menu { width: 100%; display: flex; overflow-x: auto; padding: 15px 10px; gap: 10px; background: #111; border-top: 1px solid #333; }
+        .scroll-menu button { flex: 0 0 auto; padding: 12px 20px; background: #222; border: 1px solid #444; color: white; border-radius: 8px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div style="text-align:center; padding: 15px; font-weight: bold; font-size: 18px;">
+        SCORE: <span id="score">0</span> | STREAK: <span id="streak">0</span>
+    </div>
+
+    <div id="msg" style="text-align:center; font-weight:bold; color: yellow; height: 30px; font-size: 14px;">CHỌN KILLER ĐỂ BẮT ĐẦU</div>
+
+    <div id="arena">
+        <div class="character survivor">
+            <div class="arm" id="p-arm"></div>
+        </div>
+        <div class="character killer" id="killer-body">
+            <div id="k-name" style="position:absolute; top:-35px; width:100%; text-align:center; color:red; font-size:16px; font-weight:bold;">OFFLINE</div>
+            <div id="weapon-container">
+                <div id="w-claw" class="weapon claw"></div>
+                <div id="w-dual" class="weapon dual"></div>
+                <div id="w-dagger" class="weapon dagger"></div>
+                <div id="w-hclaw" class="weapon h-claw"></div>
+                <div id="w-machete" class="weapon machete"></div>
+                <div id="w-fist" class="weapon fist"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="scroll-menu">
+        <button onclick="setup('john', 0.4, 'John Doe')">John Doe</button>
+        <button onclick="setup('1x', 0.4, '1x1x1x1')">1x1x1x1</button>
+        <button onclick="setup('noli', 0.35, 'Noli')">Noli</button>
+        <button onclick="setup('nos', 0.3, 'Guest 666')">Guest 666</button>
+        <button onclick="setup('jason', 0.2, 'Jason')">Jason</button>
+        <button onclick="setup('cool', 0.1, 'C00lkidd')">C00lkidd</button>
+    </div>
+
+    <div class="controls">
+        <div class="btn btn-block" id="btnQ">BLOCK</div>
+        <div class="btn btn-parry" id="btnR">R</div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playBlockSnd() {
+            const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+            o.type = 'triangle'; o.frequency.setValueAtTime(800, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.1);
+        }
+        function playParrySnd() {
+            const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+            o.type = 'sawtooth'; o.frequency.setValueAtTime(150, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+            o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.5);
+        }
+
+        let score = 0, streak = 0, baseWindUp = 0.4;
+        let isBlocking = false, canParry = false, hasQ = false;
+        let timers = [];
+
+        function setup(type, time, name) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            timers.forEach(clearTimeout);
+            baseWindUp = time;
+            document.getElementById('k-name').innerText = name.toUpperCase();
+            document.querySelectorAll('.weapon').forEach(w => w.style.display = 'none');
+            const wId = { john:'w-claw', '1x':'w-dual', noli:'w-dagger', nos:'w-hclaw', jason:'w-machete', cool:'w-fist' }[type];
+            document.getElementById(wId).style.display = 'block';
+            loop();
+        }
+
+        function loop() {
+            timers.forEach(clearTimeout);
+            document.getElementById('p-arm').className = "arm";
+            document.getElementById('killer-body').className = "character killer";
+            document.getElementById('weapon-container').style.transition = "0.2s";
+            document.getElementById('weapon-container').style.transform = "rotate(0deg)";
+            isBlocking = false; canParry = false; hasQ = false;
+            document.getElementById('msg').innerText = "CHỜ ĐỢI...";
+            timers.push(setTimeout(windUp, Math.random() * 2000 + 1000));
+        }
+
+        function windUp() {
+            document.getElementById('msg').innerText = "VẬN CÔNG...";
+            const w = document.getElementById('weapon-container');
+            w.style.transition = `transform ${baseWindUp}s ease-in-out`;
+            w.style.transform = "rotate(-110deg)";
+            timers.push(setTimeout(attack, baseWindUp * 1000));
+        }
+
+        function attack() {
+            document.getElementById('msg').innerText = "VỤT!";
+            const w = document.getElementById('weapon-container');
+            w.style.transition = "0.05s linear";
+            w.style.transform = "rotate(60deg)";
+            timers.push(setTimeout(() => {
+                if (isBlocking) {
+                    playBlockSnd();
+                    canParry = true; streak++;
+                    document.getElementById('streak').innerText = streak;
+                    setTimeout(() => { canParry = false; }, 500);
+                } else {
+                    document.getElementById('msg').innerText = "THẤT BẠI!";
+                    streak = 0; document.getElementById('streak').innerText = 0;
+                }
+                timers.push(setTimeout(loop, 1500));
+            }, 60));
+        }
+
+        function doBlock() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (!hasQ) {
+                hasQ = true; isBlocking = true;
+                document.getElementById('p-arm').classList.add('is-blocking');
+                setTimeout(() => { 
+                    isBlocking = false; 
+                    if (!canParry) { 
+                        document.getElementById('p-arm').classList.remove('is-blocking'); 
+                        hasQ = false; // QUAN TRỌNG: Cho phép block tiếp ngay lập tức
+                    } 
+                }, 350);
+            }
+        }
+
+        function doParry() {
+            if (canParry) {
+                canParry = false; score += 100;
+                document.getElementById('score').innerText = score;
+                playParrySnd();
+                document.body.classList.add('kokusen-active');
+                document.getElementById('p-arm').className = "arm is-punching";
+                document.getElementById('killer-body').classList.add('killer-knocked');
+                document.getElementById('msg').innerText = "BLACK FLASH!";
+                setTimeout(() => { document.body.classList.remove('kokusen-active'); }, 500);
+            }
+        }
+
+        document.getElementById('btnQ').addEventListener('touchstart', (e) => { e.preventDefault(); doBlock(); });
+        document.getElementById('btnR').addEventListener('touchstart', (e) => { e.preventDefault(); doParry(); });
+        document.getElementById('btnQ').addEventListener('mousedown', (e) => { doBlock(); });
+        document.getElementById('btnR').addEventListener('mousedown', (e) => { doParry(); });
+    </script>
+</body>
+</html>
