@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Forsaken Trainer - Classic Arm Impact</title>
+    <style>
+        body {
+            background-color: #050505; color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden;
+        }
+        
+        /* Hiệu ứng Hắc Thiểm */
+        .kokusen-active { animation: kokusen-vibe 0.5s steps(2), shake 0.15s infinite; }
+        @keyframes kokusen-vibe { 0% { filter: invert(1) contrast(8); } 100% { filter: invert(0); } }
+        @keyframes shake {
+            0% { transform: translate(4px, 4px); }
+            50% { transform: translate(-4px, -2px); }
+            100% { transform: translate(2px, -4px); }
+        }
+
+        #ui-layer { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; z-index: 100; }
+        .stat { font-size: 26px; font-weight: bold; text-shadow: 0 0 15px #ff0000; }
+
+        #arena {
+            position: relative; width: 850px; height: 380px;
+            border-bottom: 5px solid #444;
+            display: flex; align-items: flex-end; justify-content: center;
+            gap: 200px; padding-bottom: 20px;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        #lightning-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+
+        .character { width: 70px; height: 130px; position: relative; z-index: 10; border-radius: 4px; }
+        .survivor { background: #3498db; border: 2px solid #2980b9; }
+        
+        /* TAY VÀNG - Về lại vị trí cũ bên hông */
+        .arm {
+            position: absolute; 
+            width: 45px; height: 18px; 
+            background: #f1c40f; 
+            border: 2.5px solid #d4ac0d;
+            border-radius: 4px;
+            top: 45px; 
+            left: 10px; /* Nằm hơi lùi vào trong người */
+            transform-origin: left center;
+            transition: 0.1s cubic-bezier(0.1, 0.9, 0.2, 1);
+            z-index: 5; /* Nằm sau thân người để đấm xuyên ra */
+        }
+
+        /* Khi Block: Giơ cao đỡ đòn */
+        .arm-block { 
+            transform: rotate(-80deg) translateY(-20px); 
+            border-color: #fff; 
+            box-shadow: 0 0 15px #fff; 
+            z-index: 11; /* Khi đỡ thì tay hiện lên trên */
+        }
+
+        /* Khi Parry: Đấm từ trong ra ngoài (Xuyên qua người) */
+        .arm-punch { 
+            left: 60px !important; /* Đẩy mạnh từ sau lưng ra trước */
+            transform: rotate(0deg); 
+            background: #000 !important; 
+            border: 3px solid #ff0000 !important; 
+            box-shadow: 0 0 50px #ff0000; 
+            z-index: 12; /* Hiện ra trước người khi đấm */
+        }
+
+        .killer { background: #000; border: 2px solid #ff0000; transition: 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .killer-knocked { transform: translate(950px, -650px) rotate(1800deg) !important; opacity: 0; }
+
+        #weapon-container { position: absolute; bottom: 60px; left: -10px; transform-origin: bottom center; z-index: 11; }
+        .weapon { position: absolute; display: none; transform-origin: bottom center; background: #fff; }
+        .claw { width: 25px; height: 90px; } .dual { width: 10px; height: 110px; box-shadow: -15px 0 0 #fff; }
+        .dagger { width: 8px; height: 60px; transform: rotate(-90deg); } .h-claw { width: 85px; height: 15px; background: #ff4757; }
+        .machete { width: 18px; height: 110px; } .fist { width: 40px; height: 40px; background: #f1c40f; }
+
+        .menu { margin: 20px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        button { padding: 12px; background: #111; color: #fff; border: 1px solid #444; cursor: pointer; font-weight: bold; }
+        button:hover { background: #ff0000; }
+
+        #guide-table { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; font-size: 14px; border: 1px solid #333; margin-top: 10px; }
+        .time-val { color: #f1c40f; font-weight: bold; margin-left: 5px; }
+
+        #key-guide { margin-top: 10px; font-size: 14px; color: #888; }
+        .key { background: #fff; color: #000; padding: 2px 8px; border-radius: 4px; font-weight: 900; }
+    </style>
+</head>
+<body onclick="initAudio()">
+
+    <div id="ui-layer">
+        <div class="stat">SCORE: <span id="score">0</span></div>
+        <div class="stat">STREAK: <span id="streak">0</span></div>
+    </div>
+
+    <div id="msg" style="font-size:32px; font-weight:900; height:60px; text-align:center;">BẤM ĐỂ CHƠI</div>
+    
+    <div id="arena">
+        <canvas id="lightning-canvas"></canvas>
+        <div class="character survivor" id="player">
+            <div class="arm" id="p-arm"></div>
+        </div>
+        <div class="character killer" id="killer-body">
+            <div id="k-name" style="position:absolute; top:-40px; width:100%; text-align:center; color:red; font-size:20px; font-weight:bold;">OFFLINE</div>
+            <div id="weapon-container">
+                <div id="w-claw" class="weapon claw"></div>
+                <div id="w-dual" class="weapon dual"></div>
+                <div id="w-dagger" class="weapon dagger"></div>
+                <div id="w-hclaw" class="weapon h-claw"></div>
+                <div id="w-machete" class="weapon machete"></div>
+                <div id="w-fist" class="weapon fist"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="menu">
+        <button onclick="setup('john', 0.4, 'John Doe')">John Doe</button>
+        <button onclick="setup('1x', 0.4, '1x1x1x1')">1x1x1x1</button>
+        <button onclick="setup('noli', 0.35, 'Noli')">Noli</button>
+        <button onclick="setup('nos', 0.3, 'Guest 666')">Guest 666</button>
+        <button onclick="setup('jason', 0.2, 'Jason')">Jason</button>
+        <button onclick="setup('cool', 0.1, 'C00lkidd')">C00lkidd</button>
+    </div>
+
+    <div id="key-guide">
+        <span class="key">Q</span> GIƠ TAY ĐỠ | <span class="key">R</span> PARRY (ĐẤM XUYÊN)
+    </div>
+
+    <table id="guide-table">
+        <tr>
+            <td>John/1x:<span class="time-val">0.4s</span></td>
+            <td>Noli:<span class="time-val">0.35s</span></td>
+            <td>Guest 666:<span class="time-val">0.3s</span></td>
+            <td>Jason:<span class="time-val">0.2s</span></td>
+            <td>C00lkidd:<span class="time-val">0.1s</span></td>
+        </tr>
+    </table>
+
+    <audio id="sndB" src="block.mp3" preload="auto"></audio>
+    <audio id="sndP" src="parry.mp3" preload="auto"></audio>
+
+    <script>
+        let score = 0, streak = 0;
+        let baseWindUp = 0.4, currentType = '';
+        let isBlocking = false, canParry = false, hasQ = false;
+        let timers = [];
+        let audioReady = false;
+
+        const canvas = document.getElementById('lightning-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 850; canvas.height = 380;
+
+        function initAudio() {
+            if (!audioReady) {
+                document.getElementById('sndB').play().then(()=>document.getElementById('sndB').pause());
+                document.getElementById('sndP').play().then(()=>document.getElementById('sndP').pause());
+                audioReady = true;
+                document.getElementById('msg').innerText = "CHỌN KILLER!";
+            }
+        }
+
+        function setup(type, time, name) {
+            initAudio();
+            timers.forEach(t => clearTimeout(t)); timers = [];
+            currentType = type; baseWindUp = time;
+            document.getElementById('k-name').innerText = name.toUpperCase();
+            document.querySelectorAll('.weapon').forEach(w => w.style.display = 'none');
+            const wId = { john:'w-claw', '1x':'w-dual', noli:'w-dagger', nos:'w-hclaw', jason:'w-machete', cool:'w-fist' }[type];
+            document.getElementById(wId).style.display = 'block';
+            loop();
+        }
+
+        function loop() {
+            timers.forEach(t => clearTimeout(t));
+            const wWrap = document.getElementById('weapon-container');
+            const arm = document.getElementById('p-arm');
+            wWrap.style.transition = "0.2s";
+            wWrap.style.transform = "rotate(0deg)";
+            arm.className = "arm";
+            document.getElementById('killer-body').className = "character killer";
+            ctx.clearRect(0,0, 850, 380);
+            isBlocking = false; canParry = false; hasQ = false;
+            document.getElementById('msg').innerText = "ĐANG CHỜ...";
+
+            timers.push(setTimeout(() => {
+                if (Math.random() < 0.35) {
+                    document.getElementById('msg').innerText = "NHỬ (BAIT)!";
+                    wWrap.style.transform = "rotate(-35deg)";
+                    timers.push(setTimeout(() => {
+                        wWrap.style.transform = "rotate(0deg)";
+                        timers.push(setTimeout(windUp, 400));
+                    }, 150));
+                } else windUp();
+            }, Math.random() * 2000 + 1000));
+        }
+
+        function windUp() {
+            document.getElementById('msg').innerText = "VẬN CÔNG...";
+            const wWrap = document.getElementById('weapon-container');
+            wWrap.style.transition = `transform ${baseWindUp}s ease-in-out`;
+            wWrap.style.transform = "rotate(-110deg)";
+            timers.push(setTimeout(attack, baseWindUp * 1000));
+        }
+
+        function attack() {
+            document.getElementById('msg').innerText = "VỤT!";
+            const wWrap = document.getElementById('weapon-container');
+            wWrap.style.transition = "0.05s linear";
+            wWrap.style.transform = "rotate(60deg)";
+            timers.push(setTimeout(() => {
+                if (isBlocking) {
+                    document.getElementById('msg').innerText = "R ĐI!";
+                    document.getElementById('sndB').currentTime = 0; document.getElementById('sndB').play();
+                    canParry = true; streak++;
+                    document.getElementById('streak').innerText = streak;
+                    setTimeout(() => canParry = false, 450);
+                } else {
+                    document.getElementById('msg').innerText = "THẤT BẠI!"; 
+                    streak = 0; document.getElementById('streak').innerText = 0;
+                }
+                timers.push(setTimeout(loop, 2000));
+            }, 60));
+        }
+
+        function drawLightning() {
+            ctx.clearRect(0,0, 850, 380);
+            for(let i=0; i<20; i++) {
+                ctx.beginPath();
+                ctx.lineWidth = Math.random() * 7 + 2;
+                ctx.strokeStyle = i % 2 === 0 ? "#ff0000" : "#000";
+                let x = 400, y = 180;
+                ctx.moveTo(x, y);
+                for(let j=0; j<10; j++) {
+                    x += (Math.random() - 0.5) * 450; y += (Math.random() - 0.5) * 450;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            const arm = document.getElementById('p-arm');
+            if (k === 'q' && !hasQ && currentType !== '') {
+                hasQ = true; isBlocking = true;
+                arm.classList.add('arm-block');
+                setTimeout(() => { isBlocking = false; if(!canParry) arm.classList.remove('arm-block'); }, 450);
+            }
+            if (k === 'r' && canParry) {
+                canParry = false; score += 100;
+                document.getElementById('score').innerText = score;
+                document.getElementById('sndP').currentTime = 0; document.getElementById('sndP').play();
+                document.body.classList.add('kokusen-active');
+                arm.classList.remove('arm-block'); 
+                arm.classList.add('arm-punch'); // Lao thẳng từ sau ra trước
+                document.getElementById('killer-body').classList.add('killer-knocked');
+                document.getElementById('msg').innerText = "BLACK FLASH!";
+                let lInt = setInterval(drawLightning, 50);
+                setTimeout(() => { document.body.classList.remove('kokusen-active'); clearInterval(lInt); }, 500);
+            }
+        });
+    </script>
+</body>
+</html>
