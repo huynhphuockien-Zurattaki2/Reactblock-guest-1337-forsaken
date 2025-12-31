@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Forsaken PvP ONLINE - Full Original Features</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        /* GIỮ NGUYÊN STYLE GỐC CỦA BẠN */
+        body {
+            background-color: #050505; color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden;
+        }
+        
+        .kokusen-active { animation: kokusen-vibe 0.5s steps(2), shake 0.15s infinite; }
+        @keyframes kokusen-vibe { 0% { filter: invert(1) contrast(8); } 100% { filter: invert(0); } }
+        @keyframes shake { 0% { transform: translate(4px, 4px); } 50% { transform: translate(-4px, -2px); } 100% { transform: translate(2px, -4px); } }
+
+        /* Network Panel UI */
+        #net-panel {
+            position: fixed; top: 10px; left: 10px; background: rgba(15,15,15,0.95);
+            padding: 12px; border: 1px solid #444; border-radius: 8px; z-index: 2000; font-size: 12px;
+        }
+
+        #ui-layer { position: absolute; top: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 100; }
+        .hp-container { width: 300px; height: 20px; background: #333; border: 2px solid #fff; position: relative; overflow: hidden; border-radius: 5px; }
+        .hp-bar { height: 100%; width: 100%; transition: 0.2s cubic-bezier(0.1, 0.9, 0.2, 1); }
+        #p1-hp { background: #3498db; box-shadow: 0 0 10px #3498db; }
+        #p2-hp { background: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
+        
+        .stats-row { display: flex; gap: 50px; margin-bottom: 10px; }
+        .hp-box { text-align: center; font-weight: bold; }
+
+        #arena {
+            position: relative; width: 900px; height: 380px; border-bottom: 5px solid #444;
+            display: flex; align-items: flex-end; justify-content: center;
+            gap: 200px; padding-bottom: 20px;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        #lightning-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        .character { width: 70px; height: 130px; position: relative; z-index: 10; border-radius: 4px; }
+        .survivor { background: #3498db; border: 2px solid #2980b9; }
+        
+        .arm {
+            position: absolute; width: 45px; height: 18px; background: #f1c40f; border: 2.5px solid #d4ac0d;
+            border-radius: 4px; top: 45px; left: 10px; transform-origin: left center;
+            transition: 0.1s; z-index: 5;
+        }
+
+        .arm-block { transform: rotate(-80deg) translateY(-20px); border-color: #fff; box-shadow: 0 0 15px #fff; z-index: 11; }
+        .arm-punch { left: 70px !important; transform: rotate(0deg); background: #000 !important; border: 3px solid #ff0000 !important; box-shadow: 0 0 50px #ff0000; z-index: 12; }
+        .arm-locked { opacity: 0.4; filter: grayscale(1); }
+
+        .killer { background: #000; border: 2px solid #ff0000; transition: 0.6s; }
+        .killer-knocked { transform: translate(1000px, -700px) rotate(1800deg) !important; opacity: 0; }
+        .killer-cooldown { opacity: 0.3 !important; }
+
+        #weapon-container { position: absolute; bottom: 60px; left: -10px; transform-origin: bottom center; z-index: 11; }
+        .weapon { position: absolute; display: none; transform-origin: bottom center; background: #fff; }
+        
+        .w-claw { width: 20px; height: 90px; clip-path: polygon(0 0, 100% 0, 50% 100%); display: block; }
+        .w-dual { width: 10px; height: 110px; box-shadow: -15px 0 0 #fff; display: block; }
+        .w-machete { width: 18px; height: 110px; display: block; }
+        .w-fist { width: 45px; height: 45px; background: #f1c40f; border-radius: 8px; border: 2px solid #000; display: block; }
+        .w-dagger { width: 8px; height: 60px; display: block; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+
+        .selector { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .selector button { padding: 6px 10px; background: #222; color: #fff; border: 1px solid #444; cursor: pointer; border-radius: 5px; font-size: 11px; }
+
+        #key-guide {
+            margin-top: 25px; padding: 10px 20px; background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px; border: 1px solid #333; display: flex; gap: 20px; font-size: 13px; color: #aaa;
+        }
+        .key-item b { color: #fff; background: #444; padding: 2px 6px; border-radius: 3px; margin-right: 5px; }
+        .key-item span { color: #f1c40f; font-weight: bold; }
+
+        #win-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: none; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        #btn-reset { margin-top: 20px; padding: 15px 40px; font-size: 20px; background: #ff0000; color: #fff; border: none; cursor: pointer; font-weight: bold; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="net-panel">
+        <div><span id="status-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:gray;"></span> <span id="status-text">Đang khởi tạo...</span></div>
+        <div id="my-id" style="color:yellow; margin:4px 0; font-weight:bold;">ID: ---</div>
+        <input type="text" id="join-id" placeholder="Nhập ID đối thủ..." style="width:100px; background:#000; color:#fff; border:1px solid #444;">
+        <button onclick="joinRoom()" style="cursor:pointer;">Connect</button>
+        <div id="role-display" style="margin-top:4px; font-weight:bold; color: cyan;"></div>
+    </div>
+
+    <audio id="snd-block" src="block.mp3"></audio>
+    <audio id="snd-parry" src="parry.mp3"></audio>
+
+    <div id="ui-layer">
+        <div class="stats-row">
+            <div class="hp-box">P1 (SURVIVOR)<div class="hp-container"><div id="p1-hp" class="hp-bar"></div></div></div>
+            <div class="hp-box">P2 (KILLER)<div class="hp-container"><div id="p2-hp" class="hp-bar"></div></div></div>
+        </div>
+        <div id="block-status" style="color: #00ff00; font-weight: bold;">BLOCK: READY</div>
+    </div>
+
+    <div id="msg" style="font-size:22px; font-weight:900; height:50px; text-align:center; color:#f1c40f;">COOLDOWN KILLER: 1.75s</div>
+    
+    <div id="arena">
+        <canvas id="lightning-canvas"></canvas>
+        <div class="character survivor" id="p1-body"><div class="arm" id="p-arm"></div></div>
+        <div class="character killer" id="killer-body">
+            <div id="k-name" style="position:absolute; top:-40px; width:100%; text-align:center; color:red; font-size:18px; font-weight:bold;">OFFLINE</div>
+            <div id="weapon-container"><div id="current-weapon" class="weapon w-machete"></div></div>
+        </div>
+    </div>
+
+    <div class="selector" id="k-selector" style="display:none;">
+        <button onclick="selectKillerOnline('C00lkidd', 'w-fist', '#f1c40f', 0.1)">C00lkidd (0.1s)</button>
+        <button onclick="selectKillerOnline('Jason', 'w-machete', '#222', 0.2)">Jason (0.2s)</button>
+        <button onclick="selectKillerOnline('Guest 666', 'w-machete', '#600', 0.3)">Guest 666 (0.3s)</button>
+        <button onclick="selectKillerOnline('Noli', 'w-dagger', '#444', 0.35)">Noli (0.35s)</button>
+        <button onclick="selectKillerOnline('John Doe', 'w-claw', '#333', 0.4)">John Doe (0.4s)</button>
+        <button onclick="selectKillerOnline('1x1x1x1', 'w-dual', '#111', 0.4)">1x1x1x1 (0.4s)</button>
+    </div>
+
+    <div id="key-guide">
+        <div class="key-item"><b>Q</b> BLOCK</div>
+        <div class="key-item"><b>R</b> PARRY <span>(SUCCESS BLOCK)</span></div>
+        <div class="key-item"><b>K</b> SLASH</div>
+        <div class="key-item"><b>K+K</b> <span>BAIT</span></div>
+    </div>
+
+    <div id="win-screen">
+        <h1 id="win-text" style="font-size: 60px;">VICTORY</h1>
+        <button id="btn-reset" onclick="resetGame()">PLAY AGAIN (R)</button>
+    </div>
+
+    <script>
+        // --- MULTIPLAYER CORE ---
+        let peer = new Peer(), conn = null, myRole = "";
+
+        peer.on('open', id => document.getElementById('my-id').innerText = "ID: " + id);
+        
+        peer.on('connection', c => {
+            if (conn) return;
+            conn = c; myRole = "killer"; setupConn();
+        });
+
+        function joinRoom() {
+            const id = document.getElementById('join-id').value;
+            if(!id) return;
+            conn = peer.connect(id);
+            myRole = "survivor"; setupConn();
+        }
+
+        function setupConn() {
+            document.getElementById('status-dot').style.background = "#00ff00";
+            document.getElementById('status-text').innerText = "Đã kết nối!";
+            document.getElementById('role-display').innerText = "BẠN LÀ: " + myRole.toUpperCase();
+            if(myRole === 'killer') document.getElementById('k-selector').style.display = 'flex';
+            
+            conn.on('data', data => {
+                if(data.type === 'act') handleAction(data.act);
+                if(data.type === 'syncHP') { p1HP = data.p1; p2HP = data.p2; updateHPUI(); checkWin(); }
+                if(data.type === 'syncK') selectKiller(data.n, data.w, data.c, data.s);
+                if(data.type === 'reset') location.reload();
+            });
+        }
+
+        function sendAct(act) { if(conn) conn.send({type: 'act', act: act}); }
+        function selectKillerOnline(n, w, c, s) {
+            selectKiller(n, w, c, s);
+            if(conn) conn.send({type: 'syncK', n:n, w:w, c:c, s:s});
+        }
+
+        // --- GIỮ NGUYÊN GAME LOGIC GỐC ---
+        const sndBlock = document.getElementById('snd-block');
+        const sndParry = document.getElementById('snd-parry');
+
+        function playFileSound(audioElement) {
+            audioElement.currentTime = 0;
+            audioElement.play().catch(e => console.log("Audio play failed"));
+        }
+
+        let p1HP = 100, p2HP = 100, isGameOver = false;
+        let isInvincible = false, canParry = false, isAttacking = false, blockIsLocked = false;
+        let killerOnCooldown = false, currentWindupTime = 0.4, blockTimer = null, attackTimeout = null;
+
+        const canvas = document.getElementById('lightning-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 900; canvas.height = 380;
+
+        function selectKiller(name, weaponClass, color, windup) {
+            document.getElementById('k-name').innerText = name.toUpperCase();
+            document.getElementById('killer-body').style.backgroundColor = color;
+            document.getElementById('current-weapon').className = 'weapon ' + weaponClass;
+            currentWindupTime = windup;
+        }
+
+        function drawLightning() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for(let i=0; i<15; i++) {
+                ctx.beginPath(); ctx.lineWidth = Math.random() * 8 + 2;
+                ctx.strokeStyle = i % 2 === 0 ? "#ff0000" : "#fff";
+                let x = 450 + (Math.random()-0.5)*100, y = 190 + (Math.random()-0.5)*100;
+                ctx.moveTo(x, y);
+                for(let j=0; j<10; j++) { x += (Math.random()-0.5)*400; y += (Math.random()-0.5)*400; ctx.lineTo(x, y); }
+                ctx.stroke();
+            }
+        }
+
+        function updateHPUI() {
+            document.getElementById('p1-hp').style.width = p1HP + '%';
+            document.getElementById('p2-hp').style.width = p2HP + '%';
+        }
+
+        function checkWin() {
+            if (p1HP <= 0 || p2HP <= 0) {
+                isGameOver = true;
+                if(p2HP <= 0) document.getElementById('killer-body').classList.add('killer-knocked');
+                document.getElementById('win-screen').style.display = 'flex';
+                document.getElementById('win-text').innerText = p1HP <= 0 ? "PLAYER 2 WINS!" : "PLAYER 1 WINS!";
+            }
+        }
+
+        function updateBlockStatus(ready) {
+            const status = document.getElementById('block-status');
+            const arm = document.getElementById('p-arm');
+            if(ready) {
+                blockIsLocked = false; isInvincible = false; canParry = false;
+                status.innerText = "BLOCK: READY"; status.style.color = "#00ff00";
+                arm.className = 'arm';
+            } else {
+                blockIsLocked = true;
+                status.innerText = "BLOCK: LOCKED"; status.style.color = "#ff0000";
+                arm.classList.add('arm-locked');
+            }
+        }
+
+        function resetGame() { if(conn) conn.send({type: 'reset'}); location.reload(); }
+
+        // MÁY CHỦ XỬ LÝ HÀNH ĐỘNG
+        function handleAction(act) {
+            const arm = document.getElementById('p-arm');
+            const wWrap = document.getElementById('weapon-container');
+            const kBody = document.getElementById('killer-body');
+
+            if(act === 'q') {
+                updateBlockStatus(false);
+                isInvincible = true; arm.classList.add('arm-block');
+                clearTimeout(blockTimer);
+                blockTimer = setTimeout(() => { isInvincible = false; }, 300);
+                setTimeout(() => { if(!canParry) arm.classList.remove('arm-block'); }, 350);
+            }
+
+            if(act === 'r') {
+                canParry = false; p2HP -= 20;
+                updateHPUI();
+                document.body.classList.add('kokusen-active');
+                arm.className = 'arm arm-punch arm-locked'; 
+                playFileSound(sndParry);
+                let lInt = setInterval(drawLightning, 50);
+                setTimeout(() => { 
+                    document.body.classList.remove('kokusen-active'); clearInterval(lInt); ctx.clearRect(0,0,900,380);
+                    updateBlockStatus(true); checkWin();
+                    if(myRole === 'survivor') conn.send({type: 'syncHP', p1: p1HP, p2: p2HP});
+                }, 500);
+            }
+
+            if(act === 'k') {
+                if (killerOnCooldown) return;
+                if (isAttacking) { 
+                    clearTimeout(attackTimeout); isAttacking = false;
+                    wWrap.style.transition = "0.15s ease-out"; wWrap.style.transform = "rotate(0deg)";
+                    return; 
+                }
+                isAttacking = true;
+                wWrap.style.transition = `transform ${currentWindupTime}s ease-in-out`;
+                wWrap.style.transform = "rotate(-110deg)";
+
+                attackTimeout = setTimeout(() => {
+                    wWrap.style.transition = "0.02s linear";
+                    wWrap.style.transform = "rotate(80deg)";
+                    setTimeout(() => {
+                        if (isInvincible) {
+                            isInvincible = false; canParry = true; arm.classList.add('arm-block');
+                            playFileSound(sndBlock);
+                            setTimeout(() => { if (canParry) { canParry = false; updateBlockStatus(true); } }, 400); 
+                        } else {
+                            p1HP -= 10; updateHPUI();
+                            updateBlockStatus(true); checkWin();
+                        }
+                        setTimeout(() => {
+                            wWrap.style.transition = "0.2s"; wWrap.style.transform = "rotate(0deg)";
+                            isAttacking = false; killerOnCooldown = true;
+                            kBody.classList.add('killer-cooldown');
+                            setTimeout(() => { killerOnCooldown = false; kBody.classList.remove('killer-cooldown'); }, 1750);
+                            if(myRole === 'killer') conn.send({type: 'syncHP', p1: p1HP, p2: p2HP});
+                        }, 150);
+                    }, 20);
+                }, currentWindupTime * 1000);
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat || !conn || isGameOver) return;
+            const k = e.key.toLowerCase();
+            
+            if(myRole === 'survivor') {
+                if(k === 'q' && !blockIsLocked) { handleAction('q'); sendAct('q'); }
+                if(k === 'r' && canParry) { handleAction('r'); sendAct('r'); }
+            }
+            if(myRole === 'killer' && k === 'k') { handleAction('k'); sendAct('k'); }
+        });
+    </script>
+</body>
+</html>

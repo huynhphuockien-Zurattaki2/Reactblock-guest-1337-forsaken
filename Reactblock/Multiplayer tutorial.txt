@@ -1,0 +1,11 @@
+Cách kết nối:
+Mở file trên 2 tab trình duyệt.
+
+Tab 1 (Host) copy ID gửi cho Tab 2.
+
+Tab 2 dán ID vào và nhấn Connect.
+
+Survivor nhấn Q/R, Killer chọn nhân vật và nhấn K.
+
+NGƯỚI KẾT NỐI LÀ SURVIVOR
+Người được người kia kết nối là killer
