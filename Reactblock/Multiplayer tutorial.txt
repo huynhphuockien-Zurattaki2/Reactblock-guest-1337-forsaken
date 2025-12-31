@@ -9,3 +9,17 @@ Survivor nhấn Q/R, Killer chọn nhân vật và nhấn K.
 
 NGƯỚI KẾT NỐI LÀ SURVIVOR
 Người được người kia kết nối là killer
+
+
+English
+How to connect:
+Open the file in two browser tabs.
+
+Tab 1 (Host) copies the ID and sends it to Tab 2.
+
+Tab 2 pastes the ID and clicks Connect.
+
+Survivor presses Q/R, Killer selects a character and presses K.
+
+THE PERSON CONNECTING IS THE SURVIVOR
+The person connected to by the other person is the killer.
